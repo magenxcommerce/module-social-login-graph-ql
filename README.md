@@ -1,0 +1,66 @@
+# Magenx_SocialLoginGraphQl
+
+A minimal, headless-friendly social-login bridge for Magento.
+
+Stock Magento GraphQL can only mint a customer token from an email **and
+password** (`generateCustomerToken`). Social login produces a *verified
+identity*, not a password, so there is no stock way to turn "this is a verified
+Google user" into a Magento session. This companion module fills exactly that
+gap with a single mutation — nothing more. (Same "extend with GraphQL beside the
+core module" pattern as `Magenx_ProductAlertGraphQl`.)
+
+## What it adds
+
+```graphql
+mutation {
+  socialLogin(input: { secret: "…", email: "a@b.com", firstname: "A", lastname: "B" }) {
+    token
+    created
+  }
+}
+```
+
+The resolver:
+
+1. Verifies the shared `secret` (constant-time) — fails closed if none configured.
+2. Finds the customer by email on the request's website, or **creates** one
+   (random password, name from the provider profile). One call therefore covers
+   both register and login.
+3. Returns a Magento customer access token (via the same Integration token model
+   `generateCustomerToken` uses internally).
+
+## Security model
+
+The **shared secret is the authorization boundary** — do not rely on network
+placement. The storefront's persisted-query allowlist only guards the Next.js
+`/api/graphql` proxy (and this mutation is excluded from it, so the browser path
+is closed). But `/graphql` may still be reachable outside that proxy — directly
+(if nginx exposes a public `/graphql` location) or by anything inside the
+internal network. Since `socialLogin` mints a token for any email with no
+password, it must protect itself: the resolver fails **closed** when no secret
+is configured and compares with `hash_equals`.
+
+The storefront must call `socialLogin` **only server-to-server** from its
+trusted OAuth broker after completing the OAuth round-trip and checking
+`email_verified`. Never expose the secret or this mutation to the browser.
+
+## Configuration
+
+Set the same secret here and in the storefront. Either:
+
+```
+bin/magento config:set magenx_social_login/general/shared_secret <secret>
+```
+
+or set the environment variable (takes precedence, keeps it out of the DB):
+
+```
+MAGENX_SOCIAL_LOGIN_SECRET=<secret>
+```
+
+## Install
+
+```
+bin/magento module:enable Magenx_SocialLoginGraphQl
+bin/magento setup:upgrade
+```

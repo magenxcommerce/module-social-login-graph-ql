@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © magenxcommerce. All rights reserved.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+    <module name="Magenx_SocialLoginGraphQl">
+        <sequence>
+            <module name="Magento_Customer"/>
+            <module name="Magento_CustomerGraphQl"/>
+            <module name="Magento_Integration"/>
+            <module name="Magento_StoreGraphQl"/>
+        </sequence>
+    </module>
+</config>

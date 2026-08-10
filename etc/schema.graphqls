@@ -1,0 +1,21 @@
+# Copyright © magenxcommerce. All rights reserved.
+
+type Mutation {
+    socialLogin(
+        input: SocialLoginInput! @doc(description: "A verified social identity plus the shared server-to-server secret.")
+    ): SocialLoginOutput
+        @resolver(class: "Magenx\\SocialLoginGraphQl\\Model\\Resolver\\SocialLogin")
+        @doc(description: "Exchange a verified social identity (email + name) for a Magento customer access token, creating the customer if one does not already exist. Gated by a shared secret: this is intended to be called ONLY server-to-server by the trusted Next.js OAuth broker, never from a browser.")
+}
+
+input SocialLoginInput @doc(description: "A verified social identity. The caller (the Next.js OAuth broker) is responsible for having verified the identity with the social provider before calling this mutation.") {
+    secret: String! @doc(description: "The shared secret that authorizes this server-to-server call. Must match the storefront's configured secret.")
+    email: String! @doc(description: "The provider-verified email address of the customer.")
+    firstname: String @doc(description: "The customer's first name from the provider profile. Used only when creating a new customer.")
+    lastname: String @doc(description: "The customer's last name from the provider profile. Used only when creating a new customer.")
+}
+
+type SocialLoginOutput @doc(description: "The result of a successful social login.") {
+    token: String! @doc(description: "A Magento customer access token for the matched or newly created customer.")
+    created: Boolean! @doc(description: "True if a new customer account was created, false if an existing one was matched.")
+}
