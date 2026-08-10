@@ -1,5 +1,5 @@
 {
-    "name": "magenx/module-social-login-graph-ql",
+    "name": "magenxcommerce/module-social-login-graph-ql",
     "description": "Headless social-login bridge: a secret-gated GraphQL mutation that exchanges a verified social identity (provided by the Next.js OAuth broker) for a Magento customer token, find-or-creating the customer by email.",
     "config": {
         "sort-packages": true
