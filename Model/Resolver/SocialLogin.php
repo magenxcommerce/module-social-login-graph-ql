@@ -99,6 +99,7 @@ class SocialLogin implements ResolverInterface
      */
     private function assertAuthorized(string $secret): void
     {
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction.Discouraged -- env is the intended source for the shared secret, with config fallback below.
         $configured = (string) (getenv(self::ENV_SHARED_SECRET)
             ?: $this->scopeConfig->getValue(self::XML_PATH_SHARED_SECRET));
 
