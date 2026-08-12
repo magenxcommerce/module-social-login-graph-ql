@@ -8,10 +8,11 @@
         "php": "~8.3.0||~8.4.0||~8.5.0",
         "magento/framework": "*",
         "magento/module-customer": "*",
-        "magento/module-customer-graph-ql": "*",
+        "magento/module-graph-ql": "*",
         "magento/module-integration": "*",
         "magento/module-store": "*",
-        "magento/module-store-graph-ql": "*"
+        "magento/module-store-graph-ql": "*",
+        "psr/log": "*"
     },
     "type": "magento2-module",
     "license": [

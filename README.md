@@ -29,7 +29,12 @@ The resolver:
 2. Finds the customer by email on the request's website, or **creates** one
    (random password, name from the provider profile). One call therefore covers
    both register and login.
-3. Returns a Magento customer access token (via the same Integration token model
+3. For an **existing** account, refuses to mint a token when the account is
+   locked out or still awaiting email confirmation — the same guard rails
+   password sign-in applies. Accounts this mutation creates itself skip the
+   confirmation check, since the broker has already proven ownership of the
+   address.
+4. Returns a Magento customer access token (via the same Integration token model
    `generateCustomerToken` uses internally).
 
 ## Security model
@@ -60,6 +65,17 @@ or set the environment variable (takes precedence, keeps it out of the DB):
 ```
 MAGENX_SOCIAL_LOGIN_SECRET=<secret>
 ```
+
+The environment variable is global. The config fallback is read in **store
+scope**, so a multi-site instance can hold a different secret per store view:
+
+```
+bin/magento config:set --scope=stores --scope-code=<store> \
+  magenx_social_login/general/shared_secret <secret>
+```
+
+Rejected calls (wrong secret, or none configured) are logged as warnings with
+the store code and no PII, so probing is visible in `var/log/`.
 
 ## Install
 
