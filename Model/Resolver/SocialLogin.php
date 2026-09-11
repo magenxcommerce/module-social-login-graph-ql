@@ -75,7 +75,21 @@ class SocialLogin implements ResolverInterface
     ): array {
         $input = $args['input'] ?? [];
 
-        $store = $context->getExtensionAttributes()?->getStore();
+        try {
+            // Magento resolves the request's store lazily, so a bad `Store`
+            // header can surface here rather than in the controller: the core
+            // header validator lets the literal code `default` through without
+            // checking it exists, and the lookup then fails with a core
+            // message ("The store that was requested wasn't found.") that says
+            // nothing about which header caused it.
+            $store = $context->getExtensionAttributes()?->getStore();
+        } catch (NoSuchEntityException $e) {
+            throw new GraphQlInputException(
+                __('Unable to resolve the store for this request. Check the "Store" request header.'),
+                $e
+            );
+        }
+
         if (!$store instanceof StoreInterface) {
             throw new GraphQlInputException(__('Unable to resolve the store for this request.'));
         }
