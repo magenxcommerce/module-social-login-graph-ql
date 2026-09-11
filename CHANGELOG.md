@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.2](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v1.0.1...v1.0.2) (2026-09-11)
+
+
+### Bug Fixes
+
+* Improve Store header validation error messaging in GraphQL ([#8](https://github.com/magenxcommerce/module-social-login-graph-ql/issues/8)) ([168f583](https://github.com/magenxcommerce/module-social-login-graph-ql/commit/168f583cca5abe3c7031ce4ef549eb73381d6996))
+* report an unresolvable store as a clear input error ([168f583](https://github.com/magenxcommerce/module-social-login-graph-ql/commit/168f583cca5abe3c7031ce4ef549eb73381d6996))
+
 ## [1.0.1](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v1.0.0...v1.0.1) (2026-08-12)
 
 
