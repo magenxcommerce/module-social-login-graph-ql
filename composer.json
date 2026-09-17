@@ -6,7 +6,7 @@
     },
     "require": {
         "php": "~8.3.0||~8.4.0||~8.5.0",
-        "firebase/php-jwt": "^6.10",
+        "firebase/php-jwt": "^7.1",
         "magento/framework": "*",
         "magento/module-customer": "*",
         "magento/module-graph-ql": "*",
