@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v1.0.2...v2.0.0) (2026-09-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* SocialLoginInput takes `idToken` instead of `email`. Callers must pass the provider's ID token; `firstname`/`lastname` remain only as a display-name fallback for tokens without name claims (Apple), and never influence which account is matched. Each issuer needs a client id configured (`*_client_id` / `MAGENX_SOCIAL_LOGIN_*_CLIENT_ID`) or its tokens are rejected.
+
+### Bug Fixes
+
+* Add ID token verification to social login mutation ([#10](https://github.com/magenxcommerce/module-social-login-graph-ql/issues/10)) ([8302803](https://github.com/magenxcommerce/module-social-login-graph-ql/commit/830280301ced742e84f008f284c67190e630f2fe))
+
 ## [1.0.2](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v1.0.1...v1.0.2) (2026-09-11)
 
 
