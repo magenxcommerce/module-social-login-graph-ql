@@ -2,17 +2,17 @@
 
 type Mutation {
     socialLogin(
-        input: SocialLoginInput! @doc(description: "A verified social identity plus the shared server-to-server secret.")
+        input: SocialLoginInput! @doc(description: "A provider-signed ID token plus the shared server-to-server secret.")
     ): SocialLoginOutput
         @resolver(class: "Magenx\\SocialLoginGraphQl\\Model\\Resolver\\SocialLogin")
-        @doc(description: "Exchange a verified social identity (email + name) for a Magento customer access token, creating the customer if one does not already exist. Gated by a shared secret: this is intended to be called ONLY server-to-server by the trusted Next.js OAuth broker, never from a browser.")
+        @doc(description: "Exchange a provider-signed OpenID Connect ID token for a Magento customer access token, creating the customer if one does not already exist. Magento verifies the token itself (signature against the issuer's JWKS, issuer, audience, expiry and email_verified), so the caller is not trusted to assert an identity. Also gated by a shared secret: this is intended to be called ONLY server-to-server by the trusted Next.js OAuth broker, never from a browser.")
 }
 
-input SocialLoginInput @doc(description: "A verified social identity. The caller (the Next.js OAuth broker) is responsible for having verified the identity with the social provider before calling this mutation.") {
+input SocialLoginInput @doc(description: "A provider-signed ID token relayed by the Next.js OAuth broker. The broker does not assert the identity — it only passes on what the provider signed, and Magento verifies it.") {
     secret: String! @doc(description: "The shared secret that authorizes this server-to-server call. Must match the storefront's configured secret.")
-    email: String! @doc(description: "The provider-verified email address of the customer.")
-    firstname: String @doc(description: "The customer's first name from the provider profile. Used only when creating a new customer.")
-    lastname: String @doc(description: "The customer's last name from the provider profile. Used only when creating a new customer.")
+    idToken: String! @doc(description: "The OpenID Connect ID token (compact JWS) issued by the social provider, as received by the broker during the OAuth round-trip. The customer's email is read from this token's verified claims and nowhere else.")
+    firstname: String @doc(description: "Optional display-name fallback, used only when creating a new customer AND the ID token carries no given_name claim (Apple never puts names in the token). Never used to match an account, so it carries no authority.")
+    lastname: String @doc(description: "Optional display-name fallback, used only when creating a new customer AND the ID token carries no family_name claim. Never used to match an account, so it carries no authority.")
 }
 
 type SocialLoginOutput @doc(description: "The result of a successful social login.") {

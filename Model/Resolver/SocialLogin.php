@@ -6,12 +6,15 @@ declare(strict_types=1);
 
 namespace Magenx\SocialLoginGraphQl\Model\Resolver;
 
+use Magenx\SocialLoginGraphQl\Model\Config;
+use Magenx\SocialLoginGraphQl\Model\IdToken\VerificationException;
+use Magenx\SocialLoginGraphQl\Model\IdToken\VerifiedIdentity;
+use Magenx\SocialLoginGraphQl\Model\IdToken\Verifier;
 use Magento\Customer\Api\AccountManagementInterface;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Api\Data\CustomerInterfaceFactory;
 use Magento\Customer\Model\AuthenticationInterface;
-use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Exception\AlreadyExistsException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Exception\State\InputMismatchException;
@@ -23,32 +26,33 @@ use Magento\Framework\GraphQl\Schema\Type\ResolveInfo;
 use Magento\Framework\Math\Random;
 use Magento\Integration\Model\Oauth\TokenFactory as TokenModelFactory;
 use Magento\Store\Api\Data\StoreInterface;
-use Magento\Store\Model\ScopeInterface;
 use Psr\Log\LoggerInterface;
 
 /**
  * Resolver for the `socialLogin` mutation.
  *
- * Exchanges a *verified* social identity for a Magento customer access token,
+ * Exchanges a provider-signed ID token for a Magento customer access token,
  * creating the customer if one does not yet exist (so a single "Continue with
  * Google" action covers both registration and sign-in).
  *
- * SECURITY: Magento's /graphql endpoint is publicly reachable, so this mutation
- * is gated by a shared secret known only to the trusted Next.js OAuth broker.
- * The secret is the real authorization boundary — the storefront's persisted-
- * query allowlist is NOT (it only guards the Next.js proxy, which this call
- * deliberately bypasses). Identity verification (the OAuth round-trip,
- * email_verified check) is the broker's responsibility before it calls this.
+ * SECURITY: two independent checks guard this mutation, and they answer
+ * different questions.
+ *
+ *  - The shared secret answers "is this my broker calling?". Magento's
+ *    /graphql endpoint is publicly reachable, so without it anyone could reach
+ *    this mutation and create customer records at will.
+ *  - The ID token answers "does this person own this email?", and Magento
+ *    checks it against the provider's own signing keys rather than taking the
+ *    caller's word for it. That is what keeps a leaked secret from becoming
+ *    account takeover: the holder still cannot produce a provider signature
+ *    over an email they do not control.
+ *
+ * The email is read ONLY from the verified token claims. Nothing the caller
+ * passes alongside the token can influence which account is matched.
  */
 class SocialLogin implements ResolverInterface
 {
-    /** Config path for the shared secret (overridable by the env var below). */
-    private const XML_PATH_SHARED_SECRET = 'magenx_social_login/general/shared_secret';
-
-    /** Environment variable that, when set, takes precedence over store config. */
-    private const ENV_SHARED_SECRET = 'MAGENX_SOCIAL_LOGIN_SECRET';
-
-    /** Fallback first name when the provider sent none and the email yields nothing usable. */
+    /** Fallback first name when the token carried none and the email yields nothing usable. */
     private const FALLBACK_FIRSTNAME = 'Customer';
 
     public function __construct(
@@ -56,7 +60,8 @@ class SocialLogin implements ResolverInterface
         private readonly AccountManagementInterface $accountManagement,
         private readonly CustomerInterfaceFactory $customerFactory,
         private readonly TokenModelFactory $tokenModelFactory,
-        private readonly ScopeConfigInterface $scopeConfig,
+        private readonly Config $config,
+        private readonly Verifier $verifier,
         private readonly Random $random,
         private readonly AuthenticationInterface $authentication,
         private readonly LoggerInterface $logger
@@ -94,13 +99,13 @@ class SocialLogin implements ResolverInterface
             throw new GraphQlInputException(__('Unable to resolve the store for this request.'));
         }
 
+        // Cheapest check first: a probe never reaches the crypto or the
+        // outbound JWKS fetch behind it.
         $this->assertAuthorized((string) ($input['secret'] ?? ''), $store);
 
-        $email = strtolower(trim((string) ($input['email'] ?? '')));
-        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new GraphQlInputException(__('A valid email is required.'));
-        }
+        $identity = $this->verifyIdentity((string) ($input['idToken'] ?? ''), $store);
 
+        $email = $identity->getEmail();
         $websiteId = (int) $store->getWebsiteId();
 
         $created = false;
@@ -108,12 +113,7 @@ class SocialLogin implements ResolverInterface
             $customer = $this->customerRepository->get($email, $websiteId);
         } catch (NoSuchEntityException) {
             try {
-                $customer = $this->createCustomer(
-                    $email,
-                    trim((string) ($input['firstname'] ?? '')),
-                    trim((string) ($input['lastname'] ?? '')),
-                    $store
-                );
+                $customer = $this->createCustomer($identity, $input, $store);
                 $created = true;
             } catch (AlreadyExistsException | InputMismatchException) {
                 // Two first-time logins for the same identity can race; the one
@@ -138,9 +138,8 @@ class SocialLogin implements ResolverInterface
      * Reject the call unless the supplied secret matches the configured one.
      *
      * Uses hash_equals for a constant-time comparison and refuses to run when
-     * no secret is configured (fail closed) so the mutation can never become an
-     * open "mint a token for any email" endpoint. The store-config fallback is
-     * read in store scope, so multi-site setups can hold one secret per site.
+     * no secret is configured (fail closed), so the mutation can never become
+     * an open endpoint for minting accounts.
      *
      * @param string $secret
      * @param StoreInterface $store
@@ -149,15 +148,7 @@ class SocialLogin implements ResolverInterface
      */
     private function assertAuthorized(string $secret, StoreInterface $store): void
     {
-        // phpcs:ignore Magento2.Functions.DiscouragedFunction.Discouraged -- env is the intended source for the shared secret, with config fallback below.
-        $fromEnv = getenv(self::ENV_SHARED_SECRET);
-        $configured = is_string($fromEnv) && $fromEnv !== ''
-            ? $fromEnv
-            : (string) $this->scopeConfig->getValue(
-                self::XML_PATH_SHARED_SECRET,
-                ScopeInterface::SCOPE_STORE,
-                $store->getId()
-            );
+        $configured = $this->config->getSharedSecret($store);
 
         if ($configured === '' || !hash_equals($configured, $secret)) {
             // No PII and no secret material — just enough to spot probing in the log.
@@ -174,13 +165,40 @@ class SocialLogin implements ResolverInterface
     }
 
     /**
+     * Verify the ID token and return the identity it asserts.
+     *
+     * Every failure answers with the same message: a caller that already holds
+     * the shared secret gains nothing from a detailed reason, and a caller that
+     * does not never gets here. The specific reason goes to `var/log/` for the
+     * operator, without the token or the email in it.
+     *
+     * @param string $idToken
+     * @param StoreInterface $store
+     * @return VerifiedIdentity
+     * @throws GraphQlAuthorizationException
+     */
+    private function verifyIdentity(string $idToken, StoreInterface $store): VerifiedIdentity
+    {
+        try {
+            return $this->verifier->verify($idToken, $store);
+        } catch (VerificationException $e) {
+            $this->logger->warning(
+                'Magenx_SocialLoginGraphQl: socialLogin id token rejected.',
+                ['reason' => $e->getMessage(), 'store' => $store->getCode()]
+            );
+
+            throw new GraphQlAuthorizationException(__('Not authorized.'));
+        }
+    }
+
+    /**
      * Refuse to mint a token for an account that could not sign in with a password.
      *
      * Mirrors the checks Magento's own authentication performs, so a verified
      * social identity cannot be used to walk past a brute-force lockout or a
      * pending email confirmation on a pre-existing account. Accounts created by
-     * this mutation skip the confirmation check on purpose: the broker has
-     * already proven ownership of the address, which is what confirmation is for.
+     * this mutation skip the confirmation check on purpose: the provider has
+     * already verified ownership of the address, which is what confirmation is for.
      *
      * @param CustomerInterface $customer
      * @return void
@@ -205,26 +223,31 @@ class SocialLogin implements ResolverInterface
     /**
      * Create a password-less (random-password) customer for a social identity.
      *
-     * Magento requires both name fields, so empty provider values fall back to
-     * the email local-part / a placeholder. The random password is never shown
-     * to the user; they keep signing in via the social provider, or use the
-     * password-reset flow to set one.
+     * Names are display data, never an authorization input, so the caller's
+     * `firstname`/`lastname` are accepted as a fallback for a token that has no
+     * name claims — Apple puts the name in the first authorization callback
+     * rather than in the ID token, so without this every Apple sign-up would be
+     * named after its email local-part. Magento requires both fields, hence the
+     * final fallbacks.
      *
-     * @param string $email
-     * @param string $firstname
-     * @param string $lastname
+     * @param VerifiedIdentity $identity
+     * @param array $input
      * @param StoreInterface $store
      * @return CustomerInterface
      */
     private function createCustomer(
-        string $email,
-        string $firstname,
-        string $lastname,
+        VerifiedIdentity $identity,
+        array $input,
         StoreInterface $store
     ): CustomerInterface {
+        $email = $identity->getEmail();
+
+        $firstname = $identity->getFirstname() ?: trim((string) ($input['firstname'] ?? ''));
         if ($firstname === '') {
             $firstname = $this->firstnameFromEmail($email);
         }
+
+        $lastname = $identity->getLastname() ?: trim((string) ($input['lastname'] ?? ''));
         if ($lastname === '') {
             $lastname = '-';
         }

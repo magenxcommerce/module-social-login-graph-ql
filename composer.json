@@ -1,11 +1,12 @@
 {
     "name": "magenxcommerce/module-social-login-graph-ql",
-    "description": "Headless social-login bridge: a secret-gated GraphQL mutation that exchanges a verified social identity (provided by the Next.js OAuth broker) for a Magento customer token, find-or-creating the customer by email.",
+    "description": "Headless social-login bridge: a secret-gated GraphQL mutation that verifies a provider-signed OpenID Connect ID token (Google, Apple) against the issuer's JWKS and exchanges it for a Magento customer token, find-or-creating the customer by the token's verified email.",
     "config": {
         "sort-packages": true
     },
     "require": {
         "php": "~8.3.0||~8.4.0||~8.5.0",
+        "firebase/php-jwt": "^6.10",
         "magento/framework": "*",
         "magento/module-customer": "*",
         "magento/module-graph-ql": "*",
