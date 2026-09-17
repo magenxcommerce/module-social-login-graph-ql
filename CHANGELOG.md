@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v2.0.0...v2.0.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* Change firebase/php-jwt version to ^7.1 ([#12](https://github.com/magenxcommerce/module-social-login-graph-ql/issues/12)) ([99ec9c0](https://github.com/magenxcommerce/module-social-login-graph-ql/commit/99ec9c0bc7a0ede9e17bc2406469ac9de32c02b9))
+
 ## [2.0.0](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v1.0.2...v2.0.0) (2026-09-17)
 
 
