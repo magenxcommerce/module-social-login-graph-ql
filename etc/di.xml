@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © magenxcommerce. All rights reserved.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!--
+        Trusted ID token issuers. Adding a provider is a di.xml change plus a
+        `<code>_client_id` config value — no code. Accepting a token still
+        requires that client id to be configured, so an issuer listed here but
+        left unconfigured rejects everything.
+    -->
+    <virtualType name="Magenx\SocialLoginGraphQl\Model\IdToken\Issuer\Google" type="Magenx\SocialLoginGraphQl\Model\IdToken\Issuer">
+        <arguments>
+            <argument name="code" xsi:type="string">google</argument>
+            <argument name="issuers" xsi:type="array">
+                <!-- Google signs with either spelling; both are documented as valid. -->
+                <item name="https" xsi:type="string">https://accounts.google.com</item>
+                <item name="bare" xsi:type="string">accounts.google.com</item>
+            </argument>
+            <argument name="jwksUri" xsi:type="string">https://www.googleapis.com/oauth2/v3/certs</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="Magenx\SocialLoginGraphQl\Model\IdToken\Issuer\Apple" type="Magenx\SocialLoginGraphQl\Model\IdToken\Issuer">
+        <arguments>
+            <argument name="code" xsi:type="string">apple</argument>
+            <argument name="issuers" xsi:type="array">
+                <item name="https" xsi:type="string">https://appleid.apple.com</item>
+            </argument>
+            <argument name="jwksUri" xsi:type="string">https://appleid.apple.com/auth/keys</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Magenx\SocialLoginGraphQl\Model\IdToken\IssuerRegistry">
+        <arguments>
+            <argument name="issuers" xsi:type="array">
+                <item name="google" xsi:type="object">Magenx\SocialLoginGraphQl\Model\IdToken\Issuer\Google</item>
+                <item name="apple" xsi:type="object">Magenx\SocialLoginGraphQl\Model\IdToken\Issuer\Apple</item>
+            </argument>
+        </arguments>
+    </type>
+</config>
