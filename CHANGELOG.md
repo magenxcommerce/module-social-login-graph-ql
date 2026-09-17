@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.2](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v2.0.1...v2.0.2) (2026-09-17)
+
+
+### Bug Fixes
+
+* read env from $_ENV and $_SERVER, not getenv() alone ([b57cf24](https://github.com/magenxcommerce/module-social-login-graph-ql/commit/b57cf24519c8f92389c45c8103c1d36bc03fadd7))
+* Support environment variables from multiple sources ([#14](https://github.com/magenxcommerce/module-social-login-graph-ql/issues/14)) ([b57cf24](https://github.com/magenxcommerce/module-social-login-graph-ql/commit/b57cf24519c8f92389c45c8103c1d36bc03fadd7))
+
 ## [2.0.1](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v2.0.0...v2.0.1) (2026-09-17)
 
 
