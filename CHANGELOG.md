@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.4](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v2.0.3...v2.0.4) (2026-09-18)
+
+
+### Bug Fixes
+
+* Refactor ACL structure for stores settings ([#18](https://github.com/magenxcommerce/module-social-login-graph-ql/issues/18)) ([86c38bd](https://github.com/magenxcommerce/module-social-login-graph-ql/commit/86c38bda52dcc6ec66ce3886bbccc00520de4be2))
+
 ## [2.0.3](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v2.0.2...v2.0.3) (2026-09-18)
 
 
