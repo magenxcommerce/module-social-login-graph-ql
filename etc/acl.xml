@@ -9,8 +9,10 @@
         <resources>
             <resource id="Magento_Backend::admin">
                 <resource id="Magento_Backend::stores">
-                    <resource id="Magento_Config::config">
-                        <resource id="Magenx_SocialLoginGraphQl::config" title="Social Login Section" translate="title" sortOrder="60"/>
+                    <resource id="Magento_Backend::stores_settings">
+                        <resource id="Magento_Config::config">
+                            <resource id="Magenx_SocialLoginGraphQl::config" title="Social Login Section" translate="title" sortOrder="60"/>
+                        </resource>
                     </resource>
                 </resource>
             </resource>
