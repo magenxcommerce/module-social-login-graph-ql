@@ -88,9 +88,22 @@ where the actual reason is.
 
 ## Configuration
 
-Set the shared secret and each provider's OAuth client id as environment
-variables, which keep the values out of the database and out of `app/etc/`
-dumps:
+Set the shared secret and each provider's OAuth client id. Either as store
+config — **Stores > Configuration > Magenx > Social Login**, or the same three
+paths from the CLI:
+
+```
+bin/magento config:set magenx_social_login/general/shared_secret <secret>
+bin/magento config:set magenx_social_login/general/google_client_id <client-id>.apps.googleusercontent.com
+bin/magento config:set magenx_social_login/general/apple_client_id com.example.storefront
+```
+
+The secret field is encrypted on save, so a value entered in the admin is
+stored as ciphertext; one written straight to `core_config_data` as plain text
+is still read correctly, so an existing row keeps working.
+
+Or as environment variables, which take precedence and keep the values out of
+the database:
 
 ```
 MAGENX_SOCIAL_LOGIN_SECRET=<secret>

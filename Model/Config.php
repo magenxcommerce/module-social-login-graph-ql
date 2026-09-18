@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace Magenx\SocialLoginGraphQl\Model;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\ScopeInterface;
 
@@ -15,7 +16,8 @@ use Magento\Store\Model\ScopeInterface;
  *
  * Every value may come from an environment variable (preferred: keeps secrets
  * out of the database and out of `app/etc/config.php` dumps) or from store
- * config as a fallback. The config fallback is read in store scope so a
+ * config as a fallback — the admin fields under Stores > Configuration >
+ * Magenx > Social Login. The config fallback is read in store scope so a
  * multi-site instance can hold a different value per store view.
  */
 class Config
@@ -29,7 +31,8 @@ class Config
     private const ENV_CLIENT_ID = 'MAGENX_SOCIAL_LOGIN_%s_CLIENT_ID';
 
     public function __construct(
-        private readonly ScopeConfigInterface $scopeConfig
+        private readonly ScopeConfigInterface $scopeConfig,
+        private readonly EncryptorInterface $encryptor
     ) {
     }
 
@@ -41,7 +44,33 @@ class Config
      */
     public function getSharedSecret(StoreInterface $store): string
     {
-        return $this->resolve(self::ENV_SHARED_SECRET, self::XML_PATH_SHARED_SECRET, $store);
+        return $this->decryptIfNeeded(
+            $this->resolve(self::ENV_SHARED_SECRET, self::XML_PATH_SHARED_SECRET, $store)
+        );
+    }
+
+    /**
+     * Decrypt a secret that the admin field stored encrypted.
+     *
+     * The admin field saves through Magento's Encrypted backend model, so a
+     * value entered there comes back from ScopeConfig as ciphertext — while
+     * the same setting read from an environment variable, or from a row
+     * written before this module had an admin field, is plain text. Magento's
+     * ciphertext always carries a `<keyVersion>:<cipherVersion>:` prefix, so
+     * the shape tells the two apart; decrypting blindly and keeping whatever
+     * came back would turn an existing plaintext secret into an empty one,
+     * which fails closed and locks every customer out of social sign-in.
+     *
+     * @param string $value
+     * @return string
+     */
+    private function decryptIfNeeded(string $value): string
+    {
+        if (!preg_match('/^\d+:\d+:/', $value)) {
+            return $value;
+        }
+
+        return trim($this->encryptor->decrypt($value));
     }
 
     /**
