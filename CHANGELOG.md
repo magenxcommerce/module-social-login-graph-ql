@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v2.0.2...v2.0.3) (2026-09-18)
+
+
+### Bug Fixes
+
+* Reverting the env change and adding the admin config instead ([#16](https://github.com/magenxcommerce/module-social-login-graph-ql/issues/16)) ([7e6bf71](https://github.com/magenxcommerce/module-social-login-graph-ql/commit/7e6bf71de07eb82db827c4c518f46b6b10d2acc9))
+
 ## [2.0.2](https://github.com/magenxcommerce/module-social-login-graph-ql/compare/v2.0.1...v2.0.2) (2026-09-17)
 
 
