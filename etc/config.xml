@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © magenxcommerce. All rights reserved.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <!--
+            Every path system.xml exposes, defaulted empty: this feature must
+            not work until an integrator has configured both halves of a
+            provider, and an empty value is what makes the resolver and the
+            verifier fail closed rather than accept anything.
+        -->
+        <magenx_social_login>
+            <general>
+                <shared_secret/>
+                <google_client_id/>
+                <apple_client_id/>
+            </general>
+        </magenx_social_login>
+    </default>
+</config>

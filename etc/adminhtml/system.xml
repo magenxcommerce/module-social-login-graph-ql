@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © magenxcommerce. All rights reserved.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <!--
+            Declared locally so the module stays self-contained; Magento merges
+            tabs by id with every other Magenx module that does the same.
+        -->
+        <tab id="magenx" translate="label" sortOrder="400">
+            <label>Magenx</label>
+        </tab>
+        <section id="magenx_social_login" translate="label" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+            <class>separator-top</class>
+            <label>Social Login</label>
+            <tab>magenx</tab>
+            <resource>Magenx_SocialLoginGraphQl::config</resource>
+            <!--
+                No master "enabled" flag on purpose: the mutation fails closed.
+                With no shared secret it rejects every call, and an issuer with
+                no client id rejects every token, so leaving a field empty IS
+                the off switch. A separate flag would be a field the code never
+                reads.
+
+                Every field here is also readable from an environment variable,
+                which takes precedence (see Model/Config.php). Env keeps the
+                values out of the database and out of `app/etc/config.php`
+                dumps, so it stays the preferred place for a production store —
+                these fields are the fallback, and the place to look when
+                sign-in is rejected.
+            -->
+            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>General</label>
+                <field id="shared_secret" translate="label comment" type="obscure" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
+                    <label>Shared Secret</label>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <comment><![CDATA[Authorizes the server-to-server <code>socialLogin</code> call, and must match <code>MAGENX_SOCIAL_LOGIN_SECRET</code> on the storefront. Answers "is this my broker?" — it is not what proves the customer's identity, so it never belongs in a browser bundle. While empty (and with no <code>MAGENX_SOCIAL_LOGIN_SECRET</code> set) every call is rejected. Overridden by that environment variable when it is set.]]></comment>
+                </field>
+                <field id="google_client_id" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
+                    <label>Google OAuth Client ID</label>
+                    <comment><![CDATA[The <code>aud</code> value accepted on a Google ID token: the same client id the storefront signs in with (<code>AUTH_GOOGLE_ID</code>), ending in <code>.apps.googleusercontent.com</code>. Comma-separate several to serve sibling clients (web, iOS, Android) from one Google project. While empty, every Google token is rejected — including a perfectly valid one. Overridden by <code>MAGENX_SOCIAL_LOGIN_GOOGLE_CLIENT_ID</code> when it is set.]]></comment>
+                </field>
+                <field id="apple_client_id" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
+                    <label>Apple Services ID</label>
+                    <comment><![CDATA[The <code>aud</code> value accepted on an Apple ID token: the Services ID the storefront signs in with (<code>AUTH_APPLE_ID</code>), e.g. <code>com.example.storefront</code>. Comma-separated list accepted. While empty, every Apple token is rejected. Overridden by <code>MAGENX_SOCIAL_LOGIN_APPLE_CLIENT_ID</code> when it is set.]]></comment>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>

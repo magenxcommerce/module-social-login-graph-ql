@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace Magenx\SocialLoginGraphQl\Model;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\ScopeInterface;
 
@@ -15,7 +16,8 @@ use Magento\Store\Model\ScopeInterface;
  *
  * Every value may come from an environment variable (preferred: keeps secrets
  * out of the database and out of `app/etc/config.php` dumps) or from store
- * config as a fallback. The config fallback is read in store scope so a
+ * config as a fallback — the admin fields under Stores > Configuration >
+ * Magenx > Social Login. The config fallback is read in store scope so a
  * multi-site instance can hold a different value per store view.
  */
 class Config
@@ -29,7 +31,8 @@ class Config
     private const ENV_CLIENT_ID = 'MAGENX_SOCIAL_LOGIN_%s_CLIENT_ID';
 
     public function __construct(
-        private readonly ScopeConfigInterface $scopeConfig
+        private readonly ScopeConfigInterface $scopeConfig,
+        private readonly EncryptorInterface $encryptor
     ) {
     }
 
@@ -41,7 +44,33 @@ class Config
      */
     public function getSharedSecret(StoreInterface $store): string
     {
-        return $this->resolve(self::ENV_SHARED_SECRET, self::XML_PATH_SHARED_SECRET, $store);
+        return $this->decryptIfNeeded(
+            $this->resolve(self::ENV_SHARED_SECRET, self::XML_PATH_SHARED_SECRET, $store)
+        );
+    }
+
+    /**
+     * Decrypt a secret that the admin field stored encrypted.
+     *
+     * The admin field saves through Magento's Encrypted backend model, so a
+     * value entered there comes back from ScopeConfig as ciphertext — while
+     * the same setting read from an environment variable, or from a row
+     * written before this module had an admin field, is plain text. Magento's
+     * ciphertext always carries a `<keyVersion>:<cipherVersion>:` prefix, so
+     * the shape tells the two apart; decrypting blindly and keeping whatever
+     * came back would turn an existing plaintext secret into an empty one,
+     * which fails closed and locks every customer out of social sign-in.
+     *
+     * @param string $value
+     * @return string
+     */
+    private function decryptIfNeeded(string $value): string
+    {
+        if (!preg_match('/^\d+:\d+:/', $value)) {
+            return $value;
+        }
+
+        return trim($this->encryptor->decrypt($value));
     }
 
     /**
@@ -85,9 +114,10 @@ class Config
      */
     private function resolve(string $envVar, string $configPath, StoreInterface $store): string
     {
-        $fromEnv = $this->readEnv($envVar);
-        if ($fromEnv !== '') {
-            return $fromEnv;
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction.Discouraged -- env is the intended source, config is the fallback.
+        $fromEnv = getenv($envVar);
+        if (is_string($fromEnv) && trim($fromEnv) !== '') {
+            return trim($fromEnv);
         }
 
         return trim((string) $this->scopeConfig->getValue(
@@ -95,49 +125,5 @@ class Config
             ScopeInterface::SCOPE_STORE,
             $store->getId()
         ));
-    }
-
-    /**
-     * Read one environment variable from every place PHP can hold it.
-     *
-     * `getenv()` alone is not enough on a real Magento host, and when it comes
-     * back empty this class cannot tell "unset" from "unreadable" — both look
-     * like no configuration, which fails closed and rejects every sign-in with
-     * a reason that points at the wrong thing. Two setups where it happens:
-     *
-     *  - `getenv` is listed in php.ini `disable_functions`, common on hardened
-     *    hosts. The call returns null however well the variable is exported.
-     *  - the value is injected by nginx as a `fastcgi_param` (the usual way to
-     *    reach php-fpm when `clear_env = yes`), which arrives in `$_SERVER`.
-     *
-     * Reading `$_SERVER` is safe for a secret: the CGI spec prefixes every
-     * client-supplied header with `HTTP_`, so a request cannot forge a key of
-     * this shape.
-     *
-     * @param string $name
-     * @return string
-     */
-    private function readEnv(string $name): string
-    {
-        $candidates = [];
-
-        // function_exists() is false when the function is disabled in php.ini.
-        if (function_exists('getenv')) {
-            // phpcs:ignore Magento2.Functions.DiscouragedFunction.Discouraged -- env is the intended source, config is the fallback.
-            $candidates[] = getenv($name);
-        }
-
-        // phpcs:ignore Magento2.Security.Superglobal -- the process/request environment is exactly what is wanted here.
-        $candidates[] = $_ENV[$name] ?? null;
-        // phpcs:ignore Magento2.Security.Superglobal -- carries FastCGI params, which is how nginx passes env to php-fpm.
-        $candidates[] = $_SERVER[$name] ?? null;
-
-        foreach ($candidates as $candidate) {
-            if (is_string($candidate) && trim($candidate) !== '') {
-                return trim($candidate);
-            }
-        }
-
-        return '';
     }
 }
