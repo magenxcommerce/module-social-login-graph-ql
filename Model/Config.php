@@ -114,10 +114,9 @@ class Config
      */
     private function resolve(string $envVar, string $configPath, StoreInterface $store): string
     {
-        // phpcs:ignore Magento2.Functions.DiscouragedFunction.Discouraged -- env is the intended source, config is the fallback.
-        $fromEnv = getenv($envVar);
-        if (is_string($fromEnv) && trim($fromEnv) !== '') {
-            return trim($fromEnv);
+        $fromEnv = $this->readEnv($envVar);
+        if ($fromEnv !== '') {
+            return $fromEnv;
         }
 
         return trim((string) $this->scopeConfig->getValue(
@@ -125,5 +124,49 @@ class Config
             ScopeInterface::SCOPE_STORE,
             $store->getId()
         ));
+    }
+
+    /**
+     * Read one environment variable from every place PHP can hold it.
+     *
+     * `getenv()` alone is not enough on a real Magento host, and when it comes
+     * back empty this class cannot tell "unset" from "unreadable" — both look
+     * like no configuration, which fails closed and rejects every sign-in with
+     * a reason that points at the wrong thing. Two setups where it happens:
+     *
+     *  - `getenv` is listed in php.ini `disable_functions`, common on hardened
+     *    hosts. The call returns null however well the variable is exported.
+     *  - the value is injected by nginx as a `fastcgi_param` (the usual way to
+     *    reach php-fpm when `clear_env = yes`), which arrives in `$_SERVER`.
+     *
+     * Reading `$_SERVER` is safe for a secret: the CGI spec prefixes every
+     * client-supplied header with `HTTP_`, so a request cannot forge a key of
+     * this shape.
+     *
+     * @param string $name
+     * @return string
+     */
+    private function readEnv(string $name): string
+    {
+        $candidates = [];
+
+        // function_exists() is false when the function is disabled in php.ini.
+        if (function_exists('getenv')) {
+            // phpcs:ignore Magento2.Functions.DiscouragedFunction.Discouraged -- env is the intended source, config is the fallback.
+            $candidates[] = getenv($name);
+        }
+
+        // phpcs:ignore Magento2.Security.Superglobal -- the process/request environment is exactly what is wanted here.
+        $candidates[] = $_ENV[$name] ?? null;
+        // phpcs:ignore Magento2.Security.Superglobal -- carries FastCGI params, which is how nginx passes env to php-fpm.
+        $candidates[] = $_SERVER[$name] ?? null;
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return trim($candidate);
+            }
+        }
+
+        return '';
     }
 }

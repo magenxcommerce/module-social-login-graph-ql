@@ -111,19 +111,37 @@ MAGENX_SOCIAL_LOGIN_GOOGLE_CLIENT_ID=<client-id>.apps.googleusercontent.com
 MAGENX_SOCIAL_LOGIN_APPLE_CLIENT_ID=com.example.storefront
 ```
 
+Each value is read from `getenv()`, `$_ENV` and `$_SERVER`, so any of the ways
+a Magento host passes environment through works — including an nginx
+`fastcgi_param`, which is what to use when the php-fpm pool keeps the default
+`clear_env = yes` and strips the worker environment:
+
+```nginx
+fastcgi_param MAGENX_SOCIAL_LOGIN_GOOGLE_CLIENT_ID "<client-id>.apps.googleusercontent.com";
+```
+
 The client id must be the **same** one the broker used to obtain the token, or
 the `aud` check rejects it. A comma-separated list is accepted, for a store that
 serves sibling clients (web, iOS, Android) from one provider. An issuer with no
 client id configured rejects every token — including one that is otherwise
 perfectly valid — so both halves of a provider's setup must be present.
 
-Environment variables are global. The config fallback is read in **store
-scope**, so a multi-site instance can hold different values per store view:
+### Store-config fallback
 
+Each value also falls back to store config, read in **store scope** so a
+multi-site instance can hold a different value per store view. The module ships
+no `system.xml` yet, so these paths are not in the admin and `bin/magento
+config:set` rejects them ("The path doesn't exist") — the only way to populate
+them today is SQL:
+
+```sql
+INSERT INTO core_config_data (scope, scope_id, path, value)
+VALUES ('default', 0, 'magenx_social_login/general/google_client_id',
+        '<client-id>.apps.googleusercontent.com');
 ```
-bin/magento config:set --scope=stores --scope-code=<store> \
-  magenx_social_login/general/shared_secret <secret>
-```
+
+followed by `bin/magento cache:clean config`. An environment variable takes
+precedence over a row like this, so a stale variable will shadow it.
 
 ### Outbound network access
 
